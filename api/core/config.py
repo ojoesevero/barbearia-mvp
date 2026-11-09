@@ -11,7 +11,11 @@ load_dotenv()
 class Settings:
     """Variáveis de ambiente e parâmetros operacionais do sistema."""
 
-    supabase_url: str = os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
+    supabase_url: str = (
+        os.getenv("NEXT_PUBLIC_SUPABASE_URL", "")
+        .rstrip("/")
+        .removesuffix("/rest/v1")
+    )
     supabase_key: str = os.getenv(
         "SUPABASE_SERVICE_ROLE_KEY",
         os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", ""),
@@ -38,3 +42,4 @@ class Settings:
 
 
 settings = Settings()
+
