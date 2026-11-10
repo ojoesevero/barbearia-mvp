@@ -90,9 +90,9 @@ ALTER TABLE public.profiles
 CREATE TABLE IF NOT EXISTS public.barber_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     barber_id UUID NOT NULL REFERENCES public.barbers(id) ON DELETE CASCADE,
-    day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Dom, 6=Sáb
+    day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Dom, 1=Seg ... 6=Sáb
     start_time TIME NOT NULL DEFAULT '09:00:00',
-    end_time TIME NOT NULL DEFAULT '19:00:00',
+    end_time TIME NOT NULL DEFAULT '20:00:00',
     break_start TIME DEFAULT '12:00:00',
     break_end TIME DEFAULT '13:00:00',
     slot_interval_minutes SMALLINT NOT NULL DEFAULT 30,
@@ -325,3 +325,4 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_credit_loyalty_points
     AFTER UPDATE ON public.appointments
     FOR EACH ROW EXECUTE FUNCTION public.credit_loyalty_points_on_completion();
+

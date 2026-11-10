@@ -107,3 +107,4 @@ Acesse `http://localhost:3000`.
 - [🗄️ Modelagem do Banco de Dados (`docs/DATABASE.md`)](docs/DATABASE.md)
 - [🔌 API Python & Integração WhatsApp (`docs/API_AND_WHATSAPP.md`)](docs/API_AND_WHATSAPP.md)
 - [☁️ Guia de Deploy na Vercel & Supabase (`docs/DEPLOY.md`)](docs/DEPLOY.md)
+

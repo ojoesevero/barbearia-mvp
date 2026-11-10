@@ -2,7 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    if (process.env.NODE_ENV === "development") {
+    if (
+      process.env.NODE_ENV === "development" &&
+      process.env.NEXT_PUBLIC_ENABLE_LOCAL_PYTHON_PROXY === "true"
+    ) {
       return [
         {
           source: "/api/py/:path*",

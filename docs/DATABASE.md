@@ -90,3 +90,4 @@ erDiagram
 | `public.loyalty_transactions` | Histórico auditável de pontos ganhos (`earn`) e resgatados (`redeem`). |
 | `public.chat_rooms` / `public.chat_messages` | Salas de bate-papo e mensagens em tempo real entre barbeiro e cliente. |
 | `public.whatsapp_notifications` | Log de auditoria e fila de envios de mensagens via WhatsApp. |
+

@@ -21,3 +21,4 @@ def get_supabase_client() -> Optional[Any]:
         except Exception:
             return None
     return _supabase_client
+

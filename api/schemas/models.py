@@ -7,7 +7,12 @@ from pydantic import BaseModel, EmailStr, Field
 
 class ClientCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=3, max_length=120)
-    phone: str = Field(..., min_length=10, max_length=20, description="Telefone com DDD ex: +5511999999999")
+    phone: str = Field(
+        ...,
+        min_length=10,
+        max_length=20,
+        description="Telefone com DDD ex: +5511999999999",
+    )
     email: Optional[EmailStr] = None
     birth_date: Optional[date] = None
     preferred_barber_id: Optional[str] = None
@@ -52,13 +57,25 @@ class WhatsAppNotificationRequest(BaseModel):
     phone: str
     client_name: str
     template_type: Literal[
-        "confirmation", "reminder_24h", "cancellation", "loyalty_reward", "chat_reply"
+        "welcome_auto_reply",
+        "confirmation",
+        "reminder_24h",
+        "cancellation",
+        "loyalty_reward",
+        "chat_reply",
     ]
     appointment_date: Optional[str] = None
     appointment_time: Optional[str] = None
     barber_name: Optional[str] = None
     service_name: Optional[str] = None
+    booking_url: Optional[str] = None
     custom_message: Optional[str] = None
+
+
+class WhatsAppInboundWebhook(BaseModel):
+    sender_phone: str
+    sender_name: Optional[str] = "Cliente"
+    incoming_text: str = "Oi, quero agendar um corte!"
 
 
 class ChatMessageRequest(BaseModel):

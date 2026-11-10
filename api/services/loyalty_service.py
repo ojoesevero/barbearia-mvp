@@ -34,3 +34,4 @@ def evaluate_reward_redemption(
         "stamps_count": current_stamps,
         "message": "Recompensa resgatada com sucesso! Apresente o voucher ao seu barbeiro.",
     }
+

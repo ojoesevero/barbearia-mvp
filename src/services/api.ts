@@ -1,6 +1,8 @@
 import { TimeSlot } from "@/types/barbershop";
+import { supabase } from "@/lib/supabase";
 
-const DEFAULT_TIMES = [
+// Expediente padrão das barbearias: Segunda a Sábado, das 09:00 às 20:00 (Almoço 12:00-13:00)
+export const WORKING_HOURS_SLOTS = [
   "09:00",
   "09:30",
   "10:00",
@@ -19,29 +21,53 @@ const DEFAULT_TIMES = [
   "17:30",
   "18:00",
   "18:30",
+  "19:00",
+  "19:30",
 ];
+
+export function isSundayDate(dateStr?: string): boolean {
+  if (!dateStr || typeof dateStr !== "string") return false;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const dateObj = new Date(y, m - 1, d);
+  return dateObj.getDay() === 0;
+}
 
 export async function fetchBarberAvailability(
   barberId: string,
-  targetDate: string
+  targetDate: string,
+  bookedTimesForDay: string[] = []
 ): Promise<TimeSlot[]> {
-  try {
-    const res = await fetch(
-      `/api/py/availability?barber_id=${encodeURIComponent(barberId)}&target_date=${encodeURIComponent(targetDate)}`
-    );
-    if (res.ok) {
-      const data = await res.json();
-      return data.slots as TimeSlot[];
-    }
-  } catch {
-    // Fallback local se o servidor Python local não estiver rodando em paralelo no dev
+  if (isSundayDate(targetDate)) {
+    return [];
   }
 
-  // Gera disponibilidade determinística por barbeiro + data para experiência fluida
-  const hash = (barberId.charCodeAt(0) + targetDate.charCodeAt(targetDate.length - 1)) % 4;
-  return DEFAULT_TIMES.map((time, idx) => ({
+  const bookedSet = new Set(bookedTimesForDay);
+
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("appointments")
+        .select("start_time")
+        .eq("barber_id", barberId)
+        .eq("appointment_date", targetDate)
+        .neq("status", "cancelled");
+
+      if (data) {
+        for (const row of data) {
+          if (row.start_time) {
+            bookedSet.add(String(row.start_time).slice(0, 5));
+          }
+        }
+      }
+    } catch {
+      // Fallback para estado em memória se offline
+    }
+  }
+
+  return WORKING_HOURS_SLOTS.map((time) => ({
     time,
-    available: (idx + hash) % 5 !== 0,
+    available: !bookedSet.has(time),
   }));
 }
 
@@ -49,6 +75,7 @@ export async function sendWhatsAppNotification(payload: {
   phone: string;
   client_name: string;
   template_type:
+    | "welcome_auto_reply"
     | "confirmation"
     | "reminder_24h"
     | "cancellation"
@@ -58,19 +85,25 @@ export async function sendWhatsAppNotification(payload: {
   appointment_time?: string;
   barber_name?: string;
   service_name?: string;
+  booking_url?: string;
   custom_message?: string;
 }) {
-  try {
-    const res = await fetch("/api/py/notifications/whatsapp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // Fallback local
+  const appUrl =
+    payload.booking_url ||
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+
+  if (payload.template_type === "welcome_auto_reply") {
+    return {
+      status: "simulated",
+      provider: "evolution",
+      recipient: payload.phone,
+      message_preview:
+        `💈 *Olá, ${payload.client_name}! Bem-vindo à Barbearia Navalha de Ouro!* ✂️\n\n` +
+        `No momento estou atendendo na cadeira, mas para você *não precisar esperar*, escolha seu serviço e veja todos os horários disponíveis agora neste link:\n\n` +
+        `👉 *${appUrl}*\n\n` +
+        `🕘 *Funcionamento:* Segunda a Sábado, das 09:00 às 20:00.\n` +
+        `Assim que confirmar no link, já cai direto na minha agenda da bancada!`,
+    };
   }
 
   return {

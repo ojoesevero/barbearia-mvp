@@ -1,21 +1,33 @@
-"""Serviço de cálculo de disponibilidade de horários na agenda dos barbeiros."""
+"""Serviço de cálculo de disponibilidade de horários na agenda dos barbeiros (Seg a Sáb, 09:00 às 20:00)."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List
+
+
+def is_working_day(target_date: date) -> bool:
+    """
+    Verifica se a data é dia de funcionamento (Segunda=0 a Sábado=5 no Python).
+    Domingo (weekday == 6) a barbearia está fechada.
+    """
+    return target_date.weekday() != 6
 
 
 def generate_daily_slots(
     start_time_str: str = "09:00",
-    end_time_str: str = "19:00",
+    end_time_str: str = "20:00",
     break_start_str: str = "12:00",
     break_end_str: str = "13:00",
     interval_minutes: int = 30,
     booked_slots: List[str] | None = None,
+    target_date: date | None = None,
 ) -> List[Dict[str, object]]:
     """
-    Calcula os horários disponíveis do barbeiro no dia, descontando intervalo de almoço
-    e agendamentos já confirmados.
+    Calcula os horários disponíveis do barbeiro no dia (09:00 às 20:00 de Segunda a Sábado),
+    descontando intervalo de almoço e agendamentos já confirmados.
     """
+    if target_date and not is_working_day(target_date):
+        return []
+
     booked = set(booked_slots or [])
     fmt = "%H:%M"
     current = datetime.strptime(start_time_str, fmt)

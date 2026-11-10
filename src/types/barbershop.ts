@@ -24,6 +24,21 @@ export interface TimeSlot {
   available: boolean;
 }
 
+export interface BarberAppointmentItem {
+  id: string;
+  date: string;
+  time: string;
+  client_name: string;
+  client_phone: string;
+  service_name: string;
+  price: number;
+  duration_minutes: number;
+  loyalty_points: number;
+  barber_id: string;
+  status: "confirmed" | "completed" | "cancelled";
+  origin: "whatsapp_link" | "walk_in";
+}
+
 export interface ClientProfile {
   id?: string;
   full_name: string;

@@ -27,3 +27,4 @@ Siga este passo a passo para colocar o sistema em produção utilizando **Supaba
    - O **Vercel Cron Job** diário (`/api/py/notifications/cron-reminders`) às 11:00 UTC.
 3. Na seção **Environment Variables** da Vercel, adicione as variáveis listadas em `.env.example`.
 4. Clique em **Deploy**.
+

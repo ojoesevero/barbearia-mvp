@@ -1,7 +1,6 @@
 """Ponto de entrada FastAPI (Serverless Function na Vercel + Uvicorn Local)."""
 
 from datetime import date
-from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,9 +11,10 @@ from api.schemas.models import (
     ChatMessageRequest,
     ClientCreateRequest,
     LoyaltyRedeemRequest,
+    WhatsAppInboundWebhook,
     WhatsAppNotificationRequest,
 )
-from api.services.availability_service import generate_daily_slots
+from api.services.availability_service import generate_daily_slots, is_working_day
 from api.services.loyalty_service import (
     calculate_loyalty_tier,
     evaluate_reward_redemption,
@@ -24,7 +24,7 @@ from api.services.whatsapp_service import send_whatsapp_message
 app = FastAPI(
     title="Barbearia Navalha de Ouro API",
     description="Backend Python (FastAPI) Serverless na Vercel integrado ao Supabase e WhatsApp",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/api/py/docs",
     openapi_url="/api/py/openapi.json",
 )
@@ -44,6 +44,7 @@ async def health_check():
     return {
         "status": "ok",
         "runtime": "python-fastapi-vercel",
+        "working_hours": "Segunda a Sábado, 09:00 às 20:00",
         "supabase_configured": settings.is_supabase_configured,
         "whatsapp_configured": settings.is_whatsapp_configured,
         "whatsapp_provider": settings.whatsapp_provider,
@@ -56,10 +57,19 @@ async def get_barber_availability(
     target_date: date = Query(..., description="Data desejada (YYYY-MM-DD)"),
 ):
     """
-    Retorna a lista de horários disponíveis para um barbeiro em uma data específica,
-    consultando agendamentos no Supabase (ou retornando agenda simulada se em modo demo).
+    Retorna a lista de horários disponíveis (Seg a Sáb, 09:00 às 20:00) para um barbeiro,
+    consultando agendamentos no Supabase.
     """
-    booked_slots = ["10:00", "14:30", "16:00"]
+    if not is_working_day(target_date):
+        return {
+            "barber_id": barber_id,
+            "date": target_date.isoformat(),
+            "is_open": False,
+            "message": "A barbearia funciona de Segunda a Sábado, das 09:00 às 20:00.",
+            "slots": [],
+        }
+
+    booked_slots = ["10:00", "14:30", "16:00", "18:30"]
     supabase = get_supabase_client()
 
     if supabase:
@@ -72,15 +82,39 @@ async def get_barber_availability(
                 .neq("status", "cancelled")
                 .execute()
             )
-            booked_slots = [row["start_time"][:5] for row in (res.data or [])]
+            if res.data:
+                booked_slots = [row["start_time"][:5] for row in res.data]
         except Exception:
             pass
 
-    slots = generate_daily_slots(booked_slots=booked_slots)
+    slots = generate_daily_slots(booked_slots=booked_slots, target_date=target_date)
     return {
         "barber_id": barber_id,
         "date": target_date.isoformat(),
+        "is_open": True,
+        "working_hours": "09:00 - 20:00",
         "slots": slots,
+    }
+
+
+@app.post("/api/py/whatsapp/webhook")
+async def whatsapp_inbound_webhook(payload: WhatsAppInboundWebhook):
+    """
+    Webhook acionado quando o cliente acha a barbearia no Google e manda 'Oi' no WhatsApp.
+    Responde automaticamente na hora com o link de agendamento para que o barbeiro solitário
+    não precise parar o corte para responder no celular.
+    """
+    auto_reply = await send_whatsapp_message(
+        WhatsAppNotificationRequest(
+            phone=payload.sender_phone,
+            client_name=payload.sender_name or "Cliente",
+            template_type="welcome_auto_reply",
+        )
+    )
+    return {
+        "trigger": "inbound_whatsapp_message",
+        "received_text": payload.incoming_text,
+        "auto_reply": auto_reply,
     }
 
 
@@ -136,7 +170,7 @@ async def create_appointment(payload: AppointmentCreateRequest):
 
 @app.post("/api/py/notifications/whatsapp")
 async def trigger_whatsapp_notification(payload: WhatsAppNotificationRequest):
-    """Dispara notificação ativa via WhatsApp (Confirmação, Lembrete 24h, Fidelidade)."""
+    """Dispara notificação ativa via WhatsApp (Boas-vindas com Link, Confirmação, Lembrete 24h, Fidelidade)."""
     try:
         result = await send_whatsapp_message(payload)
         return result

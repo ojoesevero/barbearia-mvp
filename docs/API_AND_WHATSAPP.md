@@ -46,3 +46,4 @@ WHATSAPP_INSTANCE_NAME=barbearia-mvp
 ```
 
 > **Modo Sandbox Automático:** Caso `WHATSAPP_API_URL` não esteja definida durante o desenvolvimento, o serviço `api/services/whatsapp_service.py` opera automaticamente em modo `simulated`, retornando o texto formatado exato que seria entregue ao cliente para visualização na interface web.
+

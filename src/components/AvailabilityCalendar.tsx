@@ -9,31 +9,42 @@ import {
   CheckCircle2,
   Star,
   Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { Barber, BarbershopService, TimeSlot } from "@/types/barbershop";
-import { fetchBarberAvailability, sendWhatsAppNotification } from "@/services/api";
+import {
+  fetchBarberAvailability,
+  isSundayDate,
+  sendWhatsAppNotification,
+} from "@/services/api";
 
 interface AvailabilityCalendarProps {
   barbers: Barber[];
   selectedService: BarbershopService;
+  selectedDate: string;
+  onChangeDate: (date: string) => void;
+  bookedTimesForDay: string[];
   clientName: string;
   clientPhone: string;
-  onAppointmentBooked: (pointsEarned: number, serviceName: string) => void;
+  onAppointmentBooked: (booking: {
+    barberId: string;
+    date: string;
+    time: string;
+    service: BarbershopService;
+  }) => void;
 }
 
 export default function AvailabilityCalendar({
   barbers,
   selectedService,
+  selectedDate,
+  onChangeDate,
+  bookedTimesForDay,
   clientName,
   clientPhone,
   onAppointmentBooked,
 }: AvailabilityCalendarProps) {
   const [selectedBarber, setSelectedBarber] = useState<Barber>(barbers[0]);
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
-  });
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [selectedTime, setSelectedTime] = useState<string>("14:00");
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
@@ -42,10 +53,16 @@ export default function AvailabilityCalendar({
     whatsappPreview: string;
   } | null>(null);
 
+  const isSunday = isSundayDate(selectedDate);
+
   useEffect(() => {
     let active = true;
     setLoadingSlots(true);
-    fetchBarberAvailability(selectedBarber.id, selectedDate).then((data) => {
+    fetchBarberAvailability(
+      selectedBarber.id,
+      selectedDate,
+      bookedTimesForDay
+    ).then((data) => {
       if (!active) return;
       setSlots(data);
       const firstAvailable = data.find((s) => s.available);
@@ -55,9 +72,10 @@ export default function AvailabilityCalendar({
     return () => {
       active = false;
     };
-  }, [selectedBarber, selectedDate]);
+  }, [selectedBarber, selectedDate, bookedTimesForDay]);
 
   async function handleConfirmBooking() {
+    if (isSunday) return;
     const formattedDate = selectedDate.split("-").reverse().join("/");
     const whatsappResult = await sendWhatsAppNotification({
       phone: clientPhone || "+5511977774444",
@@ -80,17 +98,27 @@ export default function AvailabilityCalendar({
       whatsappPreview: whatsappResult.message_preview,
     });
 
-    onAppointmentBooked(selectedService.loyalty_points, selectedService.name);
+    onAppointmentBooked({
+      barberId: selectedBarber.id,
+      date: selectedDate,
+      time: selectedTime,
+      service: selectedService,
+    });
   }
 
   return (
     <section className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-6 shadow-xl">
-      <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold uppercase tracking-wider">
-        <CalendarIcon className="w-4 h-4" />
-        <span>Calendário & Disponibilidade</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold uppercase tracking-wider">
+          <CalendarIcon className="w-4 h-4" />
+          <span>Horários em Tempo Real</span>
+        </div>
+        <span className="text-[11px] bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium">
+          Seg a Sáb • 09:00 às 20:00
+        </span>
       </div>
       <h2 className="text-2xl font-bold text-white mt-1 mb-5">
-        Agende seu Horário
+        Veja o Melhor Horário para Você
       </h2>
 
       {/* 1. Seleção do Barbeiro */}
@@ -141,14 +169,14 @@ export default function AvailabilityCalendar({
             htmlFor="appointment-date"
             className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2"
           >
-            2. Selecione a Data
+            2. Selecione o Dia (Segunda a Sábado)
           </label>
           <input
             id="appointment-date"
             type="date"
             value={selectedDate}
             onChange={(e) => {
-              setSelectedDate(e.target.value);
+              onChangeDate(e.target.value);
               setBookingStatus(null);
             }}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
@@ -157,7 +185,7 @@ export default function AvailabilityCalendar({
 
         <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-center">
           <span className="text-[11px] text-zinc-400 uppercase font-semibold">
-            Resumo do Serviço Selecionado
+            Serviço Selecionado
           </span>
           <p className="text-sm font-bold text-white mt-0.5">
             {selectedService.name}
@@ -170,12 +198,13 @@ export default function AvailabilityCalendar({
         </div>
       </div>
 
-      {/* 3. Grade de Horários */}
+      {/* 3. Grade de Horários (09:00 às 20:00) */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2.5">
           <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
-            3. Horários Disponíveis ({selectedDate.split("-").reverse().join("/")})
+            3. Horários Disponíveis das 09:00 às 20:00 (
+            {selectedDate.split("-").reverse().join("/")})
           </label>
           <div className="flex items-center gap-3 text-[11px] text-zinc-400">
             <span className="flex items-center gap-1">
@@ -187,12 +216,24 @@ export default function AvailabilityCalendar({
           </div>
         </div>
 
-        {loadingSlots ? (
+        {isSunday ? (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <strong className="block text-amber-300">
+                Domingo a barbearia está fechada!
+              </strong>
+              Nosso atendimento funciona de{" "}
+              <strong>Segunda a Sábado, das 09:00 às 20:00</strong>. Selecione
+              outro dia no calendário acima.
+            </div>
+          </div>
+        ) : loadingSlots ? (
           <div className="text-xs text-zinc-400 py-6 text-center">
             Consultando agenda do barbeiro...
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {slots.map((slot) => {
               const isSelected = selectedTime === slot.time && slot.available;
               return (
@@ -201,7 +242,7 @@ export default function AvailabilityCalendar({
                   type="button"
                   disabled={!slot.available}
                   onClick={() => setSelectedTime(slot.time)}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition-all ${
                     !slot.available
                       ? "bg-zinc-950/40 border-zinc-800/50 text-zinc-600 line-through cursor-not-allowed"
                       : isSelected
@@ -220,11 +261,12 @@ export default function AvailabilityCalendar({
       {/* Botão de Confirmação com Disparo WhatsApp */}
       <button
         type="button"
+        disabled={isSunday}
         onClick={handleConfirmBooking}
-        className="w-full py-3.5 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-extrabold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+        className="w-full py-3.5 px-6 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-950 font-extrabold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
       >
         <UserCheck className="w-4 h-4" />
-        Confirmar Agendamento às {selectedTime} e Receber no WhatsApp
+        Confirmar Horário às {selectedTime} e Receber no WhatsApp
       </button>
 
       {/* Preview da Notificação WhatsApp Enviada */}
@@ -233,7 +275,7 @@ export default function AvailabilityCalendar({
           <div className="flex items-center justify-between mb-2">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
-              Horário Reservado & Notificação WhatsApp Disparada
+              Horário Reservado! Já aparece na Bancada do Barbeiro
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full font-semibold">
               <Sparkles className="w-3 h-3" />+{selectedService.loyalty_points} pts
@@ -243,7 +285,7 @@ export default function AvailabilityCalendar({
           <div className="bg-zinc-950/90 border border-zinc-800 rounded-lg p-3 mt-2 font-mono text-xs text-zinc-300 whitespace-pre-line">
             <div className="flex items-center gap-1.5 text-emerald-400 font-sans font-semibold mb-1.5 text-[11px]">
               <MessageSquareShare className="w-3.5 h-3.5" />
-              Mensagem enviada via WhatsApp ({clientPhone || "+5511977774444"}):
+              Comprovante enviado no WhatsApp ({clientPhone || "+5511977774444"}):
             </div>
             {bookingStatus.whatsappPreview}
           </div>

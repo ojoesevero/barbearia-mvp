@@ -48,3 +48,4 @@ flowchart TD
 ### 3.2 Fluxo de Fidelidade Automatizado
 1. Ao cadastrar um novo cliente em `public.profiles`, a trigger `trg_create_loyalty_card` cria automaticamente seu cartão em `public.loyalty_cards`.
 2. Sempre que um agendamento muda para o status `completed`, a trigger `trg_credit_loyalty_points` soma os pontos do serviço realizado, incrementa o contador de selos (1 a 10), recalcula o nível (*Bronze, Prata, Ouro, VIP*) e registra o lançamento em `public.loyalty_transactions`.
+

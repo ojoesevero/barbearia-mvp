@@ -20,12 +20,12 @@ VALUES
     ('cccccccc-cccc-cccc-cccc-cccccccccccc', '33333333-3333-3333-3333-333333333333', 'Freestyle, Pigmentação & Platinado', 'Referência em cortes urbanos, platinado e alinhamento de barba.', 4.88, 45.00)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Grade de Horários (Segunda a Sábado, das 09:00 às 19:00)
+-- 3. Grade de Horários (Segunda a Sábado, das 09:00 às 20:00)
 INSERT INTO public.barber_schedules (barber_id, day_of_week, start_time, end_time, break_start, break_end, slot_interval_minutes, is_working)
-SELECT b.id, d.day_num, '09:00:00', '19:00:00', '12:00:00', '13:00:00', 30, true
+SELECT b.id, d.day_num, '09:00:00', '20:00:00', '12:00:00', '13:00:00', 30, true
 FROM public.barbers b
 CROSS JOIN (SELECT generate_series(1, 6) AS day_num) d
-ON CONFLICT (barber_id, day_of_week) DO NOTHING;
+ON CONFLICT (barber_id, day_of_week) DO UPDATE SET end_time = '20:00:00';
 
 -- 4. Catálogo de Serviços da Barbearia
 INSERT INTO public.services (id, name, category, description, price, duration_minutes, loyalty_points)
@@ -51,3 +51,4 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE public.loyalty_cards
 SET points_balance = 120, total_points_earned = 180, stamps_count = 7, tier = 'Prata'
 WHERE client_id = '44444444-4444-4444-4444-444444444444';
+

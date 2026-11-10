@@ -1,10 +1,23 @@
 import {
   Barber,
+  BarberAppointmentItem,
   BarbershopService,
   ChatMessage,
   LoyaltyReward,
   LoyaltyTransaction,
 } from "@/types/barbershop";
+
+export function getNextWorkingDateISO(): string {
+  const d = new Date();
+  // Se for domingo (0), avança para segunda-feira
+  if (d.getDay() === 0) {
+    d.setDate(d.getDate() + 1);
+  }
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 export const INITIAL_SERVICES: BarbershopService[] = [
   {
@@ -94,6 +107,95 @@ export const INITIAL_BARBERS: Barber[] = [
     avatar_initials: "MC",
   },
 ];
+
+export function getInitialDailyAppointments(dateStr: string): BarberAppointmentItem[] {
+  return [
+    {
+      id: "apt-1",
+      date: dateStr,
+      time: "09:00",
+      client_name: "Marcos Vinícius",
+      client_phone: "+5511991112222",
+      service_name: "Corte Degradê / Clássico",
+      price: 55.0,
+      duration_minutes: 40,
+      loyalty_points: 20,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "completed",
+      origin: "whatsapp_link",
+    },
+    {
+      id: "apt-2",
+      date: dateStr,
+      time: "10:00",
+      client_name: "Henrique Souza",
+      client_phone: "+5511992223333",
+      service_name: "Combo VIP (Cabelo + Barba + Sobrancelha)",
+      price: 95.0,
+      duration_minutes: 60,
+      loyalty_points: 40,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "confirmed",
+      origin: "whatsapp_link",
+    },
+    {
+      id: "apt-3",
+      date: dateStr,
+      time: "11:00",
+      client_name: "Felipe Azevedo",
+      client_phone: "+5511993334444",
+      service_name: "Barba Terapia (Toalha Quente)",
+      price: 45.0,
+      duration_minutes: 30,
+      loyalty_points: 15,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "confirmed",
+      origin: "whatsapp_link",
+    },
+    {
+      id: "apt-4",
+      date: dateStr,
+      time: "14:30",
+      client_name: "Gabriel Martins",
+      client_phone: "+5511994445555",
+      service_name: "Corte Degradê / Clássico",
+      price: 55.0,
+      duration_minutes: 40,
+      loyalty_points: 20,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "confirmed",
+      origin: "whatsapp_link",
+    },
+    {
+      id: "apt-5",
+      date: dateStr,
+      time: "16:00",
+      client_name: "Rodrigo Almeida",
+      client_phone: "+5511995556666",
+      service_name: "Combo VIP (Cabelo + Barba + Sobrancelha)",
+      price: 95.0,
+      duration_minutes: 60,
+      loyalty_points: 40,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "confirmed",
+      origin: "walk_in",
+    },
+    {
+      id: "apt-6",
+      date: dateStr,
+      time: "18:30",
+      client_name: "Bruno Carvalho",
+      client_phone: "+5511996667777",
+      service_name: "Selagem / Hidratação Profunda",
+      price: 70.0,
+      duration_minutes: 45,
+      loyalty_points: 25,
+      barber_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      status: "confirmed",
+      origin: "whatsapp_link",
+    },
+  ];
+}
 
 export const INITIAL_REWARDS: LoyaltyReward[] = [
   {

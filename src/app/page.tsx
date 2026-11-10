@@ -1,236 +1,363 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Scissors,
-  Calendar,
-  MessageCircle,
-  Award,
-  UserCheck,
+  Plus,
+  Clock,
+  Trash2,
+  CheckCircle2,
+  Loader2,
   Smartphone,
 } from "lucide-react";
-import {
-  INITIAL_BARBERS,
-  INITIAL_LOYALTY_HISTORY,
-  INITIAL_REWARDS,
-  INITIAL_SERVICES,
-} from "@/lib/mock-data";
-import {
-  BarbershopService,
-  ClientProfile,
-  LoyaltyReward,
-  LoyaltyTransaction,
-} from "@/types/barbershop";
-import ServiceList from "@/components/ServiceList";
-import AvailabilityCalendar from "@/components/AvailabilityCalendar";
-import BarberClientChat from "@/components/BarberClientChat";
-import LoyaltyPlan from "@/components/LoyaltyPlan";
-import ClientRegistration from "@/components/ClientRegistration";
+import MobileScheduleStep from "@/components/MobileScheduleStep";
+import MobileClientBookingStep from "@/components/MobileClientBookingStep";
+
+interface ServiceRecord {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  duration_minutes: number;
+}
+
+const CATEGORIES = ["Cabelo", "Barba", "Combo", "Estética"];
+const DURATIONS = [15, 30, 40, 45, 60];
 
 export default function HomePage() {
-  const [selectedService, setSelectedService] = useState<BarbershopService>(
-    INITIAL_SERVICES[0]
-  );
+  // Inicia no Passo 3 (Visão do Cliente) para você testar o cadastro prévio + agendamento
+  const [activeTab, setActiveTab] = useState<
+    "services" | "schedule" | "client"
+  >("client");
 
-  const [clientProfile, setClientProfile] = useState<ClientProfile>({
-    full_name: "Carlos Eduardo Silva",
-    phone: "+5511977774444",
-    email: "carlos.cliente@email.com",
-    birth_date: "1994-06-15",
-    preferred_barber_id: INITIAL_BARBERS[0].id,
-    whatsapp_opt_in: true,
-  });
+  const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  const [pointsBalance, setPointsBalance] = useState<number>(120);
-  const [stampsCount, setStampsCount] = useState<number>(7);
-  const [transactions, setTransactions] = useState<LoyaltyTransaction[]>(
-    INITIAL_LOYALTY_HISTORY
-  );
+  const [name, setName] = useState<string>("");
+  const [price, setPrice] = useState<string>("");
+  const [duration, setDuration] = useState<number>(30);
+  const [category, setCategory] = useState<string>("Cabelo");
 
-  function handleAppointmentBooked(pointsEarned: number, serviceName: string) {
-    setPointsBalance((prev) => prev + pointsEarned);
-    setStampsCount((prev) => (prev >= 10 ? 1 : prev + 1));
-    setTransactions((prev) => [
-      {
-        id: `tx-${Date.now()}`,
-        type: "earn",
-        points: pointsEarned,
-        description: `Agendamento: ${serviceName}`,
-        date: new Date().toLocaleDateString("pt-BR"),
-      },
-      ...prev,
-    ]);
+  async function loadServices() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/services", { cache: "no-store" });
+      const data = await res.json();
+      if (data.services) {
+        setServices(data.services);
+      }
+    } catch {
+      // Ignora falha momentânea
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleRedeemReward(reward: LoyaltyReward) {
-    setPointsBalance((prev) => Math.max(0, prev - reward.points_cost));
-    setTransactions((prev) => [
-      {
-        id: `tx-${Date.now()}`,
-        type: "redeem",
-        points: -reward.points_cost,
-        description: `Resgate: ${reward.title}`,
-        date: new Date().toLocaleDateString("pt-BR"),
-      },
-      ...prev,
-    ]);
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  async function handleCreateService(e: React.FormEvent) {
+    e.preventDefault();
+    const numericPrice = Number(price.replace(",", "."));
+    if (!name.trim() || !numericPrice || numericPrice <= 0) return;
+
+    setSaving(true);
+    setFeedback(null);
+
+    try {
+      const res = await fetch("/api/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          price: numericPrice,
+          duration_minutes: duration,
+          category,
+        }),
+      });
+
+      if (res.ok) {
+        const { service } = await res.json();
+        setServices((prev) => [...prev, service]);
+        setName("");
+        setPrice("");
+        setFeedback(`"${service.name}" cadastrado no banco!`);
+        setTimeout(() => setFeedback(null), 3000);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteService(id: string) {
+    setServices((prev) => prev.filter((s) => s.id !== id));
+    await fetch(`/api/services?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-950">
-      {/* Header Principal */}
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-zinc-950/85 border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-zinc-950 shadow-lg shadow-amber-500/20">
-              <Scissors className="w-5 h-5" />
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center">
+      {/* Container Mobile-First (tamanho de tela de celular) */}
+      <div className="w-full max-w-md min-h-screen flex flex-col bg-zinc-950 border-x border-zinc-900 pb-20">
+        {/* Topo Simples */}
+        <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800 px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-zinc-950">
+              {activeTab === "services" ? (
+                <Scissors className="w-5 h-5" />
+              ) : activeTab === "schedule" ? (
+                <Clock className="w-5 h-5" />
+              ) : (
+                <Smartphone className="w-5 h-5" />
+              )}
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white">
-                NAVALHA DE OURO{" "}
-                <span className="text-amber-400 font-semibold text-xs ml-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
-                  BARBERSHOP MVP
-                </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                {activeTab === "services"
+                  ? "Passo 1 • Área do Barbeiro"
+                  : activeTab === "schedule"
+                  ? "Passo 2 • Área do Barbeiro"
+                  : "Passo 3 • Visão do Cliente"}
+              </span>
+              <h1 className="text-base font-extrabold text-white leading-tight">
+                {activeTab === "services"
+                  ? "Meus Serviços"
+                  : activeTab === "schedule"
+                  ? "Meu Expediente"
+                  : "Agendar Horário"}
               </h1>
-              <p className="text-[11px] text-zinc-400 hidden sm:block">
-                Next.js (Node.js) • FastAPI (Python) • Supabase • WhatsApp API
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            <div className="hidden md:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full text-zinc-300">
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>WhatsApp Ativo</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/40 px-3 py-1.5 rounded-full text-amber-300 font-bold">
-              <Award className="w-3.5 h-3.5" />
-              <span>{pointsBalance} pts</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Barra de Atalhos das 6 Funcionalidades */}
-      <div className="bg-zinc-900/50 border-b border-zinc-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
-          <div className="flex flex-wrap items-center gap-4">
-            <a
-              href="#servicos"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <Scissors className="w-3.5 h-3.5 text-amber-400" />
-              1. Lista de Serviços
-            </a>
-            <a
-              href="#calendario"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              2. Calendário & Disponibilidade
-            </a>
-            <a
-              href="#cadastro"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-              3. Notificações WhatsApp
-            </a>
-            <a
-              href="#chat"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <MessageCircle className="w-3.5 h-3.5 text-amber-400" />
-              4. Chat Barbeiro & Cliente
-            </a>
-            <a
-              href="#fidelidade"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <Award className="w-3.5 h-3.5 text-amber-400" />
-              5. Plano de Fidelidade
-            </a>
-            <a
-              href="#cadastro"
-              className="hover:text-amber-400 flex items-center gap-1.5 transition-colors"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-              6. Cadastro do Cliente
-            </a>
-          </div>
-          <span className="text-[11px] text-zinc-500">
-            Cliente logado:{" "}
-            <strong className="text-zinc-300">{clientProfile.full_name}</strong>
+          <span className="text-xs font-bold bg-zinc-900 border border-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full">
+            {activeTab === "services"
+              ? `${services.length} serviços`
+              : activeTab === "schedule"
+              ? "Seg a Sáb"
+              : "Link Online"}
           </span>
-        </div>
+        </header>
+
+        {/* Conteúdo da Aba Selecionada */}
+        <main className="flex-1 p-4 space-y-6">
+          {activeTab === "client" ? (
+            <MobileClientBookingStep services={services} />
+          ) : activeTab === "schedule" ? (
+            <MobileScheduleStep />
+          ) : (
+            <>
+              {/* Passo 1: Formulário Rápido de Cadastro de Serviço */}
+              <form
+                onSubmit={handleCreateService}
+                className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4 shadow-lg"
+              >
+                <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-amber-400" />
+                  Novo Serviço
+                </h2>
+
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">
+                    Nome do serviço
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Corte Degradê"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1">
+                    Valor cobrado (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="1"
+                    required
+                    placeholder="Ex: 50,00"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-3 text-base font-bold text-amber-400 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1.5">
+                    Tempo na cadeira
+                  </label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {DURATIONS.map((min) => (
+                      <button
+                        key={min}
+                        type="button"
+                        onClick={() => setDuration(min)}
+                        className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                          duration === min
+                            ? "bg-amber-500 border-amber-400 text-zinc-950"
+                            : "bg-zinc-950 border-zinc-800 text-zinc-400"
+                        }`}
+                      >
+                        {min}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-zinc-400 mb-1.5">
+                    Categoria
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCategory(cat)}
+                        className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                          category === cat
+                            ? "bg-zinc-100 border-white text-zinc-950 font-bold"
+                            : "bg-zinc-950 border-zinc-800 text-zinc-400"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-zinc-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-amber-500/10 transition-all"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando no Banco...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Cadastrar Serviço
+                    </>
+                  )}
+                </button>
+
+                {feedback && (
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    {feedback}
+                  </div>
+                )}
+              </form>
+
+              <section className="space-y-2.5">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-1">
+                  Serviços Ativos na Barbearia
+                </h2>
+
+                {loading ? (
+                  <div className="py-10 text-center text-xs text-zinc-500 flex flex-col items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                    Carregando serviços do Supabase...
+                  </div>
+                ) : services.length === 0 ? (
+                  <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 text-center text-xs text-zinc-400">
+                    Nenhum serviço cadastrado ainda.
+                  </div>
+                ) : (
+                  services.map((service) => (
+                    <div
+                      key={service.id}
+                      className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300">
+                            {service.category}
+                          </span>
+                          <span className="text-xs text-zinc-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {service.duration_minutes} min
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-white mt-1 truncate">
+                          {service.name}
+                        </h3>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-base font-extrabold text-amber-400">
+                          R$ {Number(service.price).toFixed(2).replace(".", ",")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteService(service.id)}
+                          aria-label={`Remover ${service.name}`}
+                          className="p-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-500 hover:text-rose-400 hover:border-rose-500/40 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </section>
+            </>
+          )}
+        </main>
+
+        {/* Barra de Navegação Inferior (3 Passos Mobile) */}
+        <nav className="fixed bottom-0 w-full max-w-md bg-zinc-950/95 backdrop-blur border-t border-zinc-800 px-3 py-2 grid grid-cols-3 gap-2 z-30">
+          <button
+            type="button"
+            onClick={() => setActiveTab("services")}
+            className={`py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+              activeTab === "services"
+                ? "bg-amber-500 text-zinc-950 shadow-md"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            1. Serviços
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("schedule")}
+            className={`py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+              activeTab === "schedule"
+                ? "bg-amber-500 text-zinc-950 shadow-md"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            2. Expediente
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("client")}
+            className={`py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+              activeTab === "client"
+                ? "bg-amber-500 text-zinc-950 shadow-md"
+                : "bg-zinc-900 text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            3. Cliente
+          </button>
+        </nav>
       </div>
-
-      {/* Conteúdo Principal em Grid Responsivo */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Linha 1: Catálogo de Serviços + Calendário de Disponibilidade */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div id="servicos" className="lg:col-span-6">
-            <ServiceList
-              services={INITIAL_SERVICES}
-              selectedService={selectedService}
-              onSelectService={setSelectedService}
-            />
-          </div>
-
-          <div id="calendario" className="lg:col-span-6">
-            <AvailabilityCalendar
-              barbers={INITIAL_BARBERS}
-              selectedService={selectedService}
-              clientName={clientProfile.full_name}
-              clientPhone={clientProfile.phone}
-              onAppointmentBooked={handleAppointmentBooked}
-            />
-          </div>
-        </div>
-
-        {/* Linha 2: Plano de Fidelidade + Chat Barbeiro/Cliente */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div id="fidelidade" className="lg:col-span-6">
-            <LoyaltyPlan
-              pointsBalance={pointsBalance}
-              stampsCount={stampsCount}
-              rewards={INITIAL_REWARDS}
-              transactions={transactions}
-              onRedeemReward={handleRedeemReward}
-            />
-          </div>
-
-          <div id="chat" className="lg:col-span-6">
-            <BarberClientChat
-              barbers={INITIAL_BARBERS}
-              clientName={clientProfile.full_name}
-              clientPhone={clientProfile.phone}
-            />
-          </div>
-        </div>
-
-        {/* Linha 3: Cadastro Básico do Cliente & Disparo de Teste WhatsApp */}
-        <div id="cadastro">
-          <ClientRegistration
-            barbers={INITIAL_BARBERS}
-            profile={clientProfile}
-            onUpdateProfile={setClientProfile}
-          />
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-zinc-900 py-6 text-center text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            © {new Date().getFullYear()} Barbearia Navalha de Ouro — MVP
-          </span>
-          <span>
-            Infraestrutura: Vercel • Supabase PostgreSQL & Realtime • Python
-            FastAPI • Node.js Next.js
-          </span>
-        </div>
-      </footer>
     </div>
   );
 }
